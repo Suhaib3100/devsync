@@ -21,23 +21,65 @@ export default function Home() {
   const [passwordProtect, setPasswordProtect] = useState(false)
   const [password, setPassword] = useState("")
   const [expiry, setExpiry] = useState("1h")
+
+  const getExpiryTime = (duration: string) => {
+    const times = {
+      '1h': 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
+    };
+    return times[duration as keyof typeof times] || times['1h'];
+  }
   const [savedSecrets, setSavedSecrets] = useState<Array<{ id: string; content: string; date: string }>>([])
 
-  const handleOpenVault = () => {
+  const handleOpenVault = async () => {
     if (secretCode.trim() !== "") {
-      setShowVault(true)
+      try {
+        const response = await fetch(`/api/secrets?id=${secretCode}&password=${password}`);
+        if (response.ok) {
+          const { content } = await response.json();
+          setSecretContent(content);
+          setShowVault(true);
+        } else {
+          console.error('Failed to retrieve secret');
+        }
+      } catch (error) {
+        console.error('Error retrieving secret:', error);
+      }
     }
   }
 
-  const handleSaveSecret = () => {
+  const handleSaveSecret = async () => {
     if (secretContent.trim() !== "") {
-      const newSecret = {
-        id: Math.random().toString(36).substring(2, 9),
-        content: secretContent,
-        date: new Date().toLocaleString(),
+      try {
+        const response = await fetch('/api/secrets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: secretContent,
+            password: passwordProtect ? password : undefined,
+            expiryTime: new Date(Date.now() + getExpiryTime(expiry)).toISOString(),
+          }),
+        });
+
+        if (response.ok) {
+          const { id } = await response.json();
+          const newSecret = {
+            id,
+            content: secretContent,
+            date: new Date().toLocaleString(),
+          };
+          setSavedSecrets([newSecret, ...savedSecrets]);
+          setSecretContent("");
+        } else {
+          console.error('Failed to save secret');
+        }
+      } catch (error) {
+        console.error('Error saving secret:', error);
       }
-      setSavedSecrets([newSecret, ...savedSecrets])
-      setSecretContent("")
     }
   }
 
@@ -484,4 +526,3 @@ export default function Home() {
     </div>
   )
 }
-

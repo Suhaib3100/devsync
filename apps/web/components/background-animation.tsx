@@ -21,7 +21,7 @@ export default function BackgroundAnimation() {
     setCanvasDimensions()
     window.addEventListener("resize", setCanvasDimensions)
 
-    // Matrix rain effect
+    // Matrix rain effect with enhanced visuals
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~"
     const fontSize = 14
     const columns = Math.floor(canvas.width / fontSize)
@@ -32,32 +32,51 @@ export default function BackgroundAnimation() {
       drops[i] = Math.random() * -100
     }
 
-    // Drawing the characters
+    // Array to store character colors
+    const colors: string[] = []
+    for (let i = 0; i < columns; i++) {
+      colors[i] = `hsl(${140 + Math.random() * 40}, 100%, ${50 + Math.random() * 20}%)`
+    }
+
+    // Drawing the characters with enhanced effects
     const draw = () => {
       // Black with opacity to create fade effect
       ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      // Green text
-      ctx.fillStyle = "#0f9"
-      ctx.font = `${fontSize}px monospace`
 
       // Loop through drops
       for (let i = 0; i < drops.length; i++) {
         // Random character
         const text = characters.charAt(Math.floor(Math.random() * characters.length))
 
-        // x = i * fontSize, y = drops[i] * fontSize
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize)
+        // Dynamic color based on position
+        const y = drops[i] * fontSize
+        const normalizedY = y / canvas.height
+        const alpha = Math.max(0.2, 1 - normalizedY)
+        ctx.fillStyle = colors[i]
+        ctx.globalAlpha = alpha
+        ctx.font = `${fontSize}px monospace`
+
+        // Add glow effect
+        ctx.shadowBlur = 5
+        ctx.shadowColor = colors[i]
+
+        // Draw character
+        ctx.fillText(text, i * fontSize, y)
+
+        // Reset shadow properties
+        ctx.shadowBlur = 0
+        ctx.globalAlpha = 1
 
         // Sending the drop back to the top randomly after it crosses the screen
-        // Adding randomness to the reset to make the drops scattered
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        if (y > canvas.height && Math.random() > 0.975) {
           drops[i] = 0
+          // Refresh color
+          colors[i] = `hsl(${140 + Math.random() * 40}, 100%, ${50 + Math.random() * 20}%)`
         }
 
-        // Incrementing Y coordinate
-        drops[i]++
+        // Incrementing Y coordinate with varying speed
+        drops[i] += 0.5 + Math.random() * 0.5
       }
     }
 
@@ -69,6 +88,6 @@ export default function BackgroundAnimation() {
     }
   }, [])
 
-  return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full opacity-20" />
+  return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full opacity-30" />
 }
 

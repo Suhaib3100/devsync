@@ -44,6 +44,10 @@ export default function Home() {
         if (response.ok) {
           setSecretContent(data.content);
           setShowVault(true);
+        } else if (response.status === 404) {
+          // If secret doesn't exist, create a new one
+          setSecretContent("");
+          setShowVault(true);
         } else {
           toast({
             title: "Error",

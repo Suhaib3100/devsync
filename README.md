@@ -1,6 +1,6 @@
 # DevSync - Encrypted Code & Text Sharing
 
-![Architecture](architecture.png)
+![Architecture](architechture.png)
 
 ## Overview  
 **DevSync** is a secure and encrypted code/text-sharing platform designed for developers and teams. Built with a layered architecture, it ensures privacy, real-time access, and efficient handling of data.

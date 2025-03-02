@@ -57,8 +57,8 @@ The system is designed using a modular approach with different layers handling s
 ## 📌 Setup  
 To deploy **DevSync**, follow these steps:  
 ```bash
-git clone https://github.com/Suhaib3100/devsync.git
-cd devsync
+git clone https://github.com/Suhaib3100/DevSync.git
+cd DevSync
 docker-compose up -d
 ```
 

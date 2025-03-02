@@ -8,9 +8,10 @@ import { motion } from "framer-motion"
 interface CodeEditorProps {
   content: string
   onChange: (value: string) => void
+  readOnly?: boolean
 }
 
-export default function CodeEditor({ content, onChange }: CodeEditorProps) {
+export default function CodeEditor({ content, onChange, readOnly }: CodeEditorProps) {
   const [language, setLanguage] = useState("plaintext")
   const [copied, setCopied] = useState(false)
   const [lineNumbers, setLineNumbers] = useState<number[]>([])
@@ -88,6 +89,7 @@ export default function CodeEditor({ content, onChange }: CodeEditorProps) {
               className="w-full bg-transparent text-zinc-300 focus:outline-none resize-none min-h-[200px]"
               style={{ lineHeight: "24px" }}
               spellCheck="false"
+              readOnly={readOnly}
             />
           </div>
         </div>

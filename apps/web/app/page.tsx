@@ -16,6 +16,7 @@ import CodeEditor from "@/components/code-editor"
 import { useToast } from "@/components/ui/use-toast"
 
 export default function Home() {
+  const { toast } = useToast()
   const [showVault, setShowVault] = useState(false)
   const [secretCode, setSecretCode] = useState("")
   const [secretContent, setSecretContent] = useState("")
@@ -263,8 +264,9 @@ export default function Home() {
                                 </div>
                                 <CodeEditor
                                   content={secret.content}
-                                  readOnly={true}
-                                />
+                                  readOnly={true} onChange={function (value: string): void {
+                                    throw new Error("Function not implemented.")
+                                  } }                                />
                               </CardContent>
                             </Card>
                           ))}

@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import BackgroundAnimation from "@/components/background-animation"
 import Header from "@/components/header"
 import CodeEditor from "@/components/code-editor"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function Home() {
   const [showVault, setShowVault] = useState(false)
@@ -25,7 +26,7 @@ export default function Home() {
   const getExpiryTime = (duration: string) => {
     const times = {
       '1h': 60 * 60 * 1000,
-      '1d': 24 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
       '7d': 7 * 24 * 60 * 60 * 1000,
       '30d': 30 * 24 * 60 * 60 * 1000
     };
@@ -37,15 +38,24 @@ export default function Home() {
     if (secretCode.trim() !== "") {
       try {
         const response = await fetch(`/api/secrets?id=${secretCode}&password=${password}`);
+        const data = await response.json();
+
         if (response.ok) {
-          const { content } = await response.json();
-          setSecretContent(content);
+          setSecretContent(data.content);
           setShowVault(true);
         } else {
-          console.error('Failed to retrieve secret');
+          toast({
+            title: "Error",
+            description: data.error || "Failed to retrieve secret",
+            variant: "destructive"
+          });
         }
       } catch (error) {
-        console.error('Error retrieving secret:', error);
+        toast({
+          title: "Error",
+          description: "Failed to connect to server",
+          variant: "destructive"
+        });
       }
     }
   }
@@ -59,26 +69,40 @@ export default function Home() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            id: secretCode, // Include the secret ID if we're updating
             content: secretContent,
             password: passwordProtect ? password : undefined,
             expiryTime: new Date(Date.now() + getExpiryTime(expiry)).toISOString(),
           }),
         });
 
+        const data = await response.json();
+
         if (response.ok) {
-          const { id } = await response.json();
           const newSecret = {
-            id,
+            id: data.id,
             content: secretContent,
             date: new Date().toLocaleString(),
           };
           setSavedSecrets([newSecret, ...savedSecrets]);
           setSecretContent("");
+          toast({
+            title: "Success",
+            description: "Secret saved successfully",
+          });
         } else {
-          console.error('Failed to save secret');
+          toast({
+            title: "Error",
+            description: data.error || "Failed to save secret",
+            variant: "destructive"
+          });
         }
       } catch (error) {
-        console.error('Error saving secret:', error);
+        toast({
+          title: "Error",
+          description: "Failed to connect to server",
+          variant: "destructive"
+        });
       }
     }
   }
@@ -225,24 +249,33 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="history">
-                    {savedSecrets.length > 0 ? (
-                      <div className="space-y-4">
-                        {savedSecrets.map((secret) => (
-                          <div key={secret.id} className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                            <div className="flex justify-between mb-2">
-                              <span className="text-xs text-zinc-400">ID: {secret.id}</span>
-                              <span className="text-xs text-zinc-400">{secret.date}</span>
-                            </div>
-                            <p className="font-mono text-sm">{secret.content}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-10 text-zinc-500">
-                        <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No secrets saved yet</p>
-                      </div>
-                    )}
+                    <div className="space-y-4">
+                      {savedSecrets.length > 0 ? (
+                        <div className="space-y-4">
+                          {savedSecrets.map((secret, index) => (
+                            <Card key={index} className="bg-zinc-800/50 border-zinc-700">
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex items-center text-sm text-zinc-400">
+                                    <History className="mr-2 h-4 w-4" />
+                                    {secret.date}
+                                  </div>
+                                </div>
+                                <CodeEditor
+                                  content={secret.content}
+                                  readOnly={true}
+                                />
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-zinc-500">
+                          <History className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                          <p>No history available</p>
+                        </div>
+                      )}
+                    </div>
                   </TabsContent>
                 </Tabs>
               </div>

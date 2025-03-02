@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { content, password, expiryTime } = secretSchema.parse(body);
+    const secretId = body.id; // Get the secret ID if it exists
 
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -65,23 +66,58 @@ export async function POST(request: NextRequest) {
     const contentEncryption = encrypt(content);
     const passwordEncryption = password ? encrypt(password) : null;
 
-    const secret = await prisma.secret.create({
-      data: {
-        content: contentEncryption.encryptedData,
-        iv: contentEncryption.iv,
-        password: passwordEncryption?.encryptedData,
-        passwordIv: passwordEncryption?.iv,
-        expiryTime: new Date(expiryTime),
-      },
-    });
+    if (secretId) {
+      // Update existing secret
+      const existingSecret = await prisma.secret.findUnique({
+        where: { id: secretId },
+      });
 
-    return NextResponse.json({ id: secret.id });
+      if (!existingSecret) {
+        return NextResponse.json({ error: 'Secret not found' }, { status: 404 });
+      }
+
+      // Create history record
+      await prisma.secretHistory.create({
+        data: {
+          content: existingSecret.content,
+          iv: existingSecret.iv,
+          secretId: existingSecret.id,
+        },
+      });
+
+      // Update the secret
+      const updatedSecret = await prisma.secret.update({
+        where: { id: secretId },
+        data: {
+          content: contentEncryption.encryptedData,
+          iv: contentEncryption.iv,
+          password: passwordEncryption?.encryptedData,
+          passwordIv: passwordEncryption?.iv,
+          expiryTime: new Date(expiryTime),
+        },
+      });
+
+      return NextResponse.json({ id: updatedSecret.id });
+    } else {
+      // Create new secret
+      const secret = await prisma.secret.create({
+        data: {
+          content: contentEncryption.encryptedData,
+          iv: contentEncryption.iv,
+          password: passwordEncryption?.encryptedData,
+          passwordIv: passwordEncryption?.iv,
+          expiryTime: new Date(expiryTime),
+        },
+      });
+
+      return NextResponse.json({ id: secret.id });
+    }
   } catch (error) {
-    console.error('Create secret error:', error);
+    console.error('Create/Update secret error:', error);
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request data', details: error.errors }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to create secret' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create/update secret' }, { status: 500 });
   }
 }
 
@@ -97,33 +133,19 @@ export async function GET(request: NextRequest) {
 
     const secret = await prisma.secret.findUnique({
       where: { id },
+      include: {
+        history: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
 
     if (!secret) {
-      // Create a new secret vault with default values
-      const defaultContent = 'Welcome to your new secret vault!';
-      const defaultExpiryTime = new Date();
-      defaultExpiryTime.setDate(defaultExpiryTime.getDate() + 7); // Set expiry to 7 days from now
-
-      const contentEncryption = encrypt(defaultContent);
-      const passwordEncryption = password ? encrypt(password) : null;
-
-      const newSecret = await prisma.secret.create({
-        data: {
-          id, // Use the requested ID
-          content: contentEncryption.encryptedData,
-          iv: contentEncryption.iv,
-          password: passwordEncryption?.encryptedData,
-          passwordIv: passwordEncryption?.iv,
-          expiryTime: defaultExpiryTime,
-        },
-      });
-
-      return NextResponse.json({ content: defaultContent });
+      return NextResponse.json({ error: 'Secret not found' }, { status: 404 });
     }
 
     if (new Date() > new Date(secret.expiryTime)) {
-      await prisma.secret.delete({ where: { id } }); // Clean up expired secret
+      await prisma.secret.delete({ where: { id } });
       return NextResponse.json({ error: 'Secret has expired' }, { status: 410 });
     }
 
@@ -140,7 +162,15 @@ export async function GET(request: NextRequest) {
       }
 
       const decryptedContent = decrypt(secret.content, secret.iv);
-      return NextResponse.json({ content: decryptedContent });
+      const decryptedHistory = secret.history.map(entry => ({
+        content: decrypt(entry.content, entry.iv),
+        createdAt: entry.createdAt,
+      }));
+
+      return NextResponse.json({
+        content: decryptedContent,
+        history: decryptedHistory,
+      });
     } catch (decryptError) {
       console.error('Decryption error:', decryptError);
       return NextResponse.json({ error: 'Failed to decrypt secret' }, { status: 500 });

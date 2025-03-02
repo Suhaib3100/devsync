@@ -8,11 +8,21 @@ datasource db {
 }
 
 model Secret {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   content     String
   iv          String
   password    String?
   passwordIv  String?
   expiryTime  DateTime
-  createdAt   DateTime @default(now())
+  createdAt   DateTime       @default(now())
+  history     SecretHistory[]
+}
+
+model SecretHistory {
+  id        String   @id @default(cuid())
+  content   String
+  iv        String
+  createdAt DateTime @default(now())
+  secret    Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  secretId  String
 }

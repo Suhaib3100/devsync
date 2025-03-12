@@ -45,9 +45,29 @@ export default function Home() {
           setSecretContent(data.content);
           setShowVault(true);
         } else if (response.status === 404) {
-          // If secret doesn't exist, create a new one
-          setSecretContent("");
-          setShowVault(true);
+          // Create a new secret with default settings
+          const newSecretResponse = await fetch('/api/secrets', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: secretCode,
+              content: "",
+              expiryTime: new Date(Date.now() + getExpiryTime("24h")).toISOString(),
+            }),
+          });
+
+          if (newSecretResponse.ok) {
+            setSecretContent("");
+            setShowVault(true);
+          } else {
+            toast({
+              title: "Error",
+              description: "Failed to create new secret",
+              variant: "destructive"
+            });
+          }
         } else {
           toast({
             title: "Error",
@@ -152,7 +172,7 @@ export default function Home() {
               <div className="backdrop-blur-md bg-zinc-900/50 p-6 rounded-lg border border-zinc-800 shadow-lg">
                 <div className="mb-4">
                   <Input
-                    type="text"
+                    type="password"
                     placeholder="Enter your secret code..."
                     value={secretCode}
                     onChange={(e) => setSecretCode(e.target.value)}

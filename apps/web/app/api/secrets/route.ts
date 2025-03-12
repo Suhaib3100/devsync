@@ -66,40 +66,8 @@ export async function POST(request: NextRequest) {
     const contentEncryption = encrypt(content);
     const passwordEncryption = password ? encrypt(password) : null;
 
-    if (secretId) {
-      // Update existing secret
-      const existingSecret = await prisma.secret.findUnique({
-        where: { id: secretId },
-      });
-
-      if (!existingSecret) {
-        return NextResponse.json({ error: 'Secret not found' }, { status: 404 });
-      }
-
-      // Create history record
-      await prisma.secretHistory.create({
-        data: {
-          content: existingSecret.content,
-          iv: existingSecret.iv,
-          secretId: existingSecret.id,
-        },
-      });
-
-      // Update the secret
-      const updatedSecret = await prisma.secret.update({
-        where: { id: secretId },
-        data: {
-          content: contentEncryption.encryptedData,
-          iv: contentEncryption.iv,
-          password: passwordEncryption?.encryptedData,
-          passwordIv: passwordEncryption?.iv,
-          expiryTime: new Date(expiryTime),
-        },
-      });
-
-      return NextResponse.json({ id: updatedSecret.id });
-    } else {
-      // Create new secret
+    // Create new secret if no secretId is provided
+    if (!secretId) {
       const secret = await prisma.secret.create({
         data: {
           content: contentEncryption.encryptedData,
@@ -112,6 +80,38 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ id: secret.id });
     }
+
+    // Update existing secret
+    const existingSecret = await prisma.secret.findUnique({
+      where: { id: secretId },
+    });
+
+    if (!existingSecret) {
+      return NextResponse.json({ error: 'Secret not found' }, { status: 404 });
+    }
+
+    // Create history record
+    await prisma.secretHistory.create({
+      data: {
+        content: existingSecret.content,
+        iv: existingSecret.iv,
+        secretId: existingSecret.id,
+      },
+    });
+
+    // Update the secret
+    const updatedSecret = await prisma.secret.update({
+      where: { id: secretId },
+      data: {
+        content: contentEncryption.encryptedData,
+        iv: contentEncryption.iv,
+        password: passwordEncryption?.encryptedData,
+        passwordIv: passwordEncryption?.iv,
+        expiryTime: new Date(expiryTime),
+      },
+    });
+
+    return NextResponse.json({ id: updatedSecret.id });
   } catch (error) {
     console.error('Create/Update secret error:', error);
     if (error instanceof z.ZodError) {

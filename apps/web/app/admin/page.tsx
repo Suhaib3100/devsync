@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, JSX } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ interface Secret {
   }[];
 }
 
-export default function AdminPage(): JSX.Element {}
+export default function AdminPage(): JSX.Element {
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
@@ -172,6 +172,7 @@ export default function AdminPage(): JSX.Element {}
           </Table>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

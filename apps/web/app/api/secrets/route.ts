@@ -67,43 +67,52 @@ export async function POST(request: NextRequest) {
     const contentEncryption = encrypt(content);
     const passwordEncryption = password ? encrypt(password) : null;
 
-    // Find existing secret
-    const existingSecret = await prisma.secret.findUnique({
-      where: { id: secretId }
-    });
-
-    if (existingSecret) {
-      // Move current content to history
-      await prisma.secretHistory.create({
+    // Create new secret if no secretId is provided
+    if (!secretId) {
+      const secret = await prisma.secret.create({
         data: {
-          content: existingSecret.content,
-          iv: existingSecret.iv,
-          secretId: existingSecret.id
-        }
+          content: contentEncryption.encryptedData,
+          iv: contentEncryption.iv,
+          password: passwordEncryption?.encryptedData,
+          passwordIv: passwordEncryption?.iv,
+          expiryTime: new Date(expiryTime),
+        },
       });
+
+      return NextResponse.json({ id: secret.id });
     }
 
-    // Create or update secret using upsert
-    const secret = await prisma.secret.upsert({
+    // Update existing secret
+    const existingSecret = await prisma.secret.findUnique({
       where: { id: secretId },
-      create: {
-        id: secretId,
+    });
+
+    if (!existingSecret) {
+      return NextResponse.json({ error: 'Secret not found' }, { status: 404 });
+    }
+
+    // Create history record
+    await prisma.secretHistory.create({
+      data: {
+        content: existingSecret.content,
+        iv: existingSecret.iv,
+        secretId: existingSecret.id,
+      },
+    });
+
+    // Update the secret
+    const updatedSecret = await prisma.secret.update({
+      where: { id: secretId },
+      data: {
         content: contentEncryption.encryptedData,
         iv: contentEncryption.iv,
         password: passwordEncryption?.encryptedData,
         passwordIv: passwordEncryption?.iv,
         expiryTime: new Date(expiryTime),
       },
-      update: {
-        content: contentEncryption.encryptedData,
-        iv: contentEncryption.iv,
-        password: passwordEncryption?.encryptedData,
-        passwordIv: passwordEncryption?.iv,
-        expiryTime: new Date(expiryTime),
-      }
     });
 
-    return NextResponse.json({ id: secret.id });
+    return NextResponse.json({ id: updatedSecret.id });
   } catch (error) {
     console.error('Create/Update secret error:', error);
     if (error instanceof z.ZodError) {
@@ -118,6 +127,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const password = searchParams.get('password');
+    const isAdmin = searchParams.get('isAdmin') === 'true';
+
+    // Handle admin request to fetch all secrets
+    if (isAdmin) {
+      const allSecrets = await prisma.secret.findMany({
+        include: {
+          history: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const decryptedSecrets = allSecrets.map(secret => ({
+        id: secret.id,
+        content: decrypt(secret.content, secret.iv),
+        createdAt: secret.createdAt,
+        expiryTime: secret.expiryTime,
+        isPasswordProtected: Boolean(secret.password),
+        history: secret.history.map(entry => ({
+          content: decrypt(entry.content, entry.iv),
+          createdAt: entry.createdAt,
+        })),
+      }));
+
+      return NextResponse.json({ secrets: decryptedSecrets });
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Secret ID is required' }, { status: 400 });

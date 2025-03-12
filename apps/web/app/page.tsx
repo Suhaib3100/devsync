@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Shield, Lock, Clock, Trash2, Key, Save, History, Github, Twitter, Linkedin } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,8 +22,45 @@ export default function Home() {
   const [secretContent, setSecretContent] = useState("")
   const [passwordProtect, setPasswordProtect] = useState(false)
   const [password, setPassword] = useState("")
-  const [expiry, setExpiry] = useState("1h")
+  const [expiry, setExpiry] = useState("7d")
+  const [savedSecrets, setSavedSecrets] = useState<Array<{ id: string; content: string; date: string }>>([])  
+  const [socket, setSocket] = useState<WebSocket | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
 
+  
+
+  const handleRefresh = async () => {
+    try {
+      const response = await fetch(`/api/secrets?id=${secretCode}&password=${password}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setSecretContent(data.content);
+        const historyEntries = data.history.map((entry: { content: string; createdAt: string }) => ({
+          id: secretCode,
+          content: entry.content,
+          date: new Date(entry.createdAt).toLocaleString()
+        }));
+        setSavedSecrets(historyEntries);
+        toast({
+          title: "Success",
+          description: "Content refreshed successfully"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to refresh content",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to connect to server",
+        variant: "destructive"
+      });
+    }
+  };
   const getExpiryTime = (duration: string) => {
     const times = {
       '1h': 60 * 60 * 1000,
@@ -33,16 +70,118 @@ export default function Home() {
     };
     return times[duration as keyof typeof times] || times['1h'];
   }
-  const [savedSecrets, setSavedSecrets] = useState<Array<{ id: string; content: string; date: string }>>([])
+  useEffect(() => {
+    if (showVault && secretCode) {
+      const ws = new WebSocket(`ws://localhost:3000/api/sync?id=${secretCode}`)
+      
+      ws.onopen = () => {
+        setIsConnected(true)
+        console.log('WebSocket Connected')
+      }
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'content_update' && data.sender !== 'self') {
+          setSecretContent(data.content)
+          // Update saved secrets history
+          const newSecret = {
+            id: secretCode,
+            content: data.content,
+            date: new Date().toLocaleString()
+          }
+          setSavedSecrets(prevSecrets => [newSecret, ...prevSecrets])
+          toast({
+            title: "Update Received",
+            description: "Content has been updated by another user"
+          })
+        }
+      }
+
+      ws.onclose = () => {
+        setIsConnected(false)
+        console.log('WebSocket Disconnected')
+      }
+
+      setSocket(ws)
+
+      return () => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close()
+        }
+      }
+    }
+  }, [showVault, secretCode])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !showVault) {
+      handleOpenVault();
+    } else if (showVault) {
+      if (e.altKey && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSaveSecret().then(() => setShowVault(false));
+      } else if (e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSaveSecret();
+      } else if (e.altKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        setSecretContent(secretContent);
+      }
+    }
+  }
 
   const handleOpenVault = async () => {
     if (secretCode.trim() !== "") {
       try {
+        // First, check if the secret exists and if it requires a password
+        const checkResponse = await fetch(`/api/secrets?id=${secretCode}`);
+        const checkData = await checkResponse.json();
+
+        if (checkResponse.status === 401) {
+          if (!passwordProtect) {
+            toast({
+              title: "Password Required",
+              description: "This vault is password protected. Please enter the password.",
+              variant: "destructive"
+            });
+            setPasswordProtect(true);
+            return;
+          } else if (!password) {
+            toast({
+              title: "Error",
+              description: "Please enter the password.",
+              variant: "destructive"
+            });
+            return;
+          }
+          // Retry with password after setting it
+          const retryResponse = await fetch(`/api/secrets?id=${secretCode}&password=${password}`);
+          const retryData = await retryResponse.json();
+          
+          if (retryResponse.ok) {
+            setSecretContent(retryData.content);
+            const historyEntries = retryData.history.map((entry: { content: string; createdAt: string }) => ({
+              id: secretCode,
+              content: entry.content,
+              date: new Date(entry.createdAt).toLocaleString()
+            }));
+            setSavedSecrets(historyEntries);
+            setShowVault(true);
+            return;
+          }
+        }
+
+        // Proceed with full secret retrieval
         const response = await fetch(`/api/secrets?id=${secretCode}&password=${password}`);
         const data = await response.json();
 
         if (response.ok) {
           setSecretContent(data.content);
+          const historyEntries = data.history.map((entry: { content: string; createdAt: string }) => ({
+            id: secretCode,
+            content: entry.content,
+            date: new Date(entry.createdAt).toLocaleString()
+          }));
+          setSavedSecrets(historyEntries);
           setShowVault(true);
         } else if (response.status === 404) {
           // Create a new secret with default settings
@@ -110,7 +249,16 @@ export default function Home() {
             date: new Date().toLocaleString(),
           };
           setSavedSecrets([newSecret, ...savedSecrets]);
-          setSecretContent("");
+          
+          // Send update through WebSocket
+          if (socket && isConnected) {
+            socket.send(JSON.stringify({
+              type: 'content_update',
+              sender: 'self',
+              content: secretContent
+            }))
+          }
+
           toast({
             title: "Success",
             description: "Secret saved successfully",
@@ -176,6 +324,7 @@ export default function Home() {
                     placeholder="Enter your secret code..."
                     value={secretCode}
                     onChange={(e) => setSecretCode(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                   />
                 </div>
@@ -267,9 +416,49 @@ export default function Home() {
                         </div>
                       )}
 
-                      <Button onClick={handleSaveSecret} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                        <Save className="mr-2 h-4 w-4" /> Save Secret Securely
-                      </Button>
+                      <div className="space-y-4">
+                        <div className="flex gap-4">
+                          <Button onClick={handleSaveSecret} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                            <Save className="mr-2 h-4 w-4" /> Save Secret (Ctrl+S)
+                          </Button>
+                          <Button 
+                            onClick={() => {
+                              handleSaveSecret().then(() => setShowVault(false));
+                            }} 
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            <Save className="mr-2 h-4 w-4" /> Save & Close (Ctrl+Shift+S)
+                          </Button>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            onClick={handleRefresh}
+                            className="gap-2 text-zinc-400 hover:text-emerald-500 hover:border-emerald-500"
+                          >
+                            <motion.div
+                              whileTap={{ rotate: 360 }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                                <path d="M21 3v5h-5"/>
+                              </svg>
+                            </motion.div>
+                            Refresh Latest Changes
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </TabsContent>
 
@@ -585,3 +774,32 @@ export default function Home() {
     </div>
   )
 }
+
+{/* Add Refresh Button */}
+<div className="mt-4 flex justify-end">
+  <Button
+    variant="outline"
+    className="gap-2"
+  >
+    <motion.div
+      whileTap={{ rotate: 360 }}
+      transition={{ duration: 0.5 }}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+        <path d="M21 3v5h-5"/>
+      </svg>
+    </motion.div>
+    Refresh
+  </Button>
+</div>

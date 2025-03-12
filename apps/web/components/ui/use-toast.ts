@@ -1,9 +1,8 @@
-import { toast, type ExternalToast } from "sonner"
+import { toast } from "sonner"
 
 type ToastProps = {
   title?: string
   description?: string
-  variant?: "default" | "destructive" | "success" | "warning" | "info"
   action?: {
     label: string
     onClick: () => void
@@ -12,8 +11,8 @@ type ToastProps = {
 
 export function useToast() {
   return {
-    toast: ({ title, description, action, variant }: ToastProps) => {
-      const toastOptions: ExternalToast = {
+    toast: ({ title, description, action }: ToastProps) => {
+      toast(title, {
         description,
         action: action
           ? {
@@ -21,25 +20,7 @@ export function useToast() {
               onClick: action.onClick,
             }
           : undefined,
-      }
-
-      // Map our variants to appropriate toast methods
-      switch (variant) {
-        case "destructive":
-          toast.error(title, toastOptions)
-          break
-        case "success":
-          toast.success(title, toastOptions)
-          break
-        case "warning":
-          toast.warning(title, toastOptions)
-          break
-        case "info":
-          toast.info(title, toastOptions)
-          break
-        default:
-          toast(title, toastOptions)
-      }
+      })
     },
     dismiss: toast.dismiss,
     error: toast.error,

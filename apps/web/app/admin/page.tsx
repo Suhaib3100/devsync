@@ -34,6 +34,7 @@ export default function AdminPage(): JSX.Element {
   const handleLogin = () => {
     if (username === "king" && password === "king") {
       setIsAuthenticated(true);
+      fetchSecrets(); // Fetch secrets after successful authentication
       toast({
         title: "Success",
         description: "Logged in successfully"
@@ -47,7 +48,8 @@ export default function AdminPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchSecrets();
+    // Remove the initial fetch on mount
+    // Only fetch when authenticated through login
   }, []);
 
   const fetchSecrets = async () => {

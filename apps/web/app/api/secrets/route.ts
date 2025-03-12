@@ -140,7 +140,9 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      const decryptedSecrets = allSecrets.map(secret => ({
+      const decryptedSecrets = allSecrets.map(secret => {
+        try {
+          return {
         id: secret.id,
         content: decrypt(secret.content, secret.iv),
         createdAt: secret.createdAt,
@@ -150,7 +152,19 @@ export async function GET(request: NextRequest) {
           content: decrypt(entry.content, entry.iv),
           createdAt: entry.createdAt,
         })),
-      }));
+      };
+        } catch (error) {
+          console.error(`Failed to decrypt secret ${secret.id}:`, error);
+          return {
+            id: secret.id,
+            content: "[Encrypted content]",
+            createdAt: secret.createdAt,
+            expiryTime: secret.expiryTime,
+            isPasswordProtected: Boolean(secret.password),
+            history: []
+          };
+        }
+      });
 
       return NextResponse.json({ secrets: decryptedSecrets });
     }
@@ -190,10 +204,20 @@ export async function GET(request: NextRequest) {
       }
 
       const decryptedContent = decrypt(secret.content, secret.iv);
-      const decryptedHistory = secret.history.map(entry => ({
-        content: decrypt(entry.content, entry.iv),
-        createdAt: entry.createdAt,
-      }));
+      const decryptedHistory = secret.history.map(entry => {
+        try {
+          return {
+            content: decrypt(entry.content, entry.iv),
+            createdAt: entry.createdAt
+          };
+        } catch (error) {
+          console.error(`Failed to decrypt history entry:`, error);
+          return {
+            content: "[Encrypted content]",
+            createdAt: entry.createdAt
+          };
+        }
+      });
 
       return NextResponse.json({
         content: decryptedContent,

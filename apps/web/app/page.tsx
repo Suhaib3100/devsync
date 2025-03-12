@@ -50,14 +50,12 @@ export default function Home() {
         toast({
           title: "Error",
           description: data.error || "Failed to refresh content",
-          variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to connect to server",
-        variant: "destructive"
       });
     }
   };
@@ -68,6 +66,11 @@ export default function Home() {
       '7d': 7 * 24 * 60 * 60 * 1000,
       '30d': 30 * 24 * 60 * 60 * 1000
     };
+  const [savedSecrets, setSavedSecrets] = useState<Array<{ id: string; content: string; date: string }>>([])
+
+  const [socket, setSocket] = useState<WebSocket | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+
     return times[duration as keyof typeof times] || times['1h'];
   }
   useEffect(() => {
@@ -141,7 +144,6 @@ export default function Home() {
             toast({
               title: "Password Required",
               description: "This vault is password protected. Please enter the password.",
-              variant: "destructive"
             });
             setPasswordProtect(true);
             return;
@@ -149,7 +151,6 @@ export default function Home() {
             toast({
               title: "Error",
               description: "Please enter the password.",
-              variant: "destructive"
             });
             return;
           }
@@ -204,21 +205,19 @@ export default function Home() {
             toast({
               title: "Error",
               description: "Failed to create new secret",
-              variant: "destructive"
             });
           }
         } else {
           toast({
             title: "Error",
             description: data.error || "Failed to retrieve secret",
-            variant: "destructive"
           });
         }
       } catch (error) {
         toast({
           title: "Error",
           description: "Failed to connect to server",
-          variant: "destructive"
+          
         });
       }
     }
@@ -267,14 +266,14 @@ export default function Home() {
           toast({
             title: "Error",
             description: data.error || "Failed to save secret",
-            variant: "destructive"
+            
           });
         }
       } catch (error) {
         toast({
           title: "Error",
           description: "Failed to connect to server",
-          variant: "destructive"
+          
         });
       }
     }
@@ -747,11 +746,11 @@ export default function Home() {
             </div>
 
             <div className="flex gap-6 mb-6 md:mb-0">
-              <a href="#" className="text-zinc-400 hover:text-emerald-500 transition-colors">
+              <a href="https://github.com/Suhaib3100  " className="text-zinc-400 hover:text-emerald-500 transition-colors">
                 <Github className="h-5 w-5" />
                 <span className="sr-only">GitHub</span>
               </a>
-              <a href="#" className="text-zinc-400 hover:text-emerald-500 transition-colors">
+              <a href="https://github.com/Suhaib3100" className="text-zinc-400 hover:text-emerald-500 transition-colors">
                 <Twitter className="h-5 w-5" />
                 <span className="sr-only">Twitter</span>
               </a>
@@ -767,7 +766,7 @@ export default function Home() {
           </div>
 
           <div className="mt-8 pt-8 border-t border-zinc-900 text-center text-xs text-zinc-600">
-            <p>DevSync is designed for educational purposes. Always follow best security practices.</p>
+            <p>DevSync is designed by <a href="https://suhaib.protool.co.in" className="text-emerald-600 hover:text-emerald-700">Suhaib King</a>.</p>
           </div>
         </div>
       </footer>
